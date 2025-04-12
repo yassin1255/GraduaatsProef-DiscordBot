@@ -2,6 +2,11 @@ import discord
 from discord import File 
 from discord.ext import commands
 from easy_pil import Editor, load_image_async, Font
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+token = os.getenv("Discord_WelcomBot_Token")
 
 
 bot = commands.Bot(command_prefix='>', intents=discord.Intents.all())
@@ -44,4 +49,4 @@ async def simulate_join(ctx):
         await ctx.send(f"❌ Fout: {str(e)}", delete_after=15)
         print(f"Test error: {e}")
 
-bot.run("MTM1NjcxNTM1MTA3NzAyODAyMA.GvY1HR.xUj-W0EtXGuHyrbLisReg6I-CGhTU2mX1s-cbo")
+bot.run(token)
