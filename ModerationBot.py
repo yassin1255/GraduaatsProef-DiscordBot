@@ -3,49 +3,63 @@ from discord import File
 from discord.ext import commands
 import os
 from dotenv import load_dotenv
+from azure.ai.contentsafety import ContentSafetyClient
+from azure.core.credentials import AzureKeyCredential
+from azure.core.exceptions import HttpResponseError
+from azure.ai.contentsafety.models import AnalyzeTextOptions
 
 load_dotenv()
 token = os.getenv("Discord_ModeratorBot_Token")
 
-client = discord.Client(intents=discord.Intents.all())
-client = commands.Bot(command_prefix='>', intents=discord.Intents.all())
-block_words = ["badword1", "badword2", "badword3"] 
 
-@client.event
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix='>', intents=discord.Intents.all())
+
+content_safety_client = ContentSafetyClient(
+    endpoint=os.getenv("Azure_Content_Safety_Endpoint"),
+    credential=AzureKeyCredential(os.getenv("Azure_Content_Safety_Key"))
+)
+
+@bot.event
 async def on_ready():
-    print("Moderatorbot is online")
+    print("bot is online")
 
-@client.event
+@bot.event
 async def on_message(message):
-    if message.author == client.user:
+    if message.author == bot.user:
         return
     
-    # Check for moderator role
-    is_moderator = any(role.name == "Moderator" for role in message.author.roles)
+    try:
+        request = AnalyzeTextOptions(text=message.content)
+        response = content_safety_client.analyze_text(request)
+        if any([
+            response.hate.severity > 0 or 
+            response.self_harm.severity > 0 or
+            response.sexual.severity > 0 or
+            response.violence.severity > 0
+        ]):
+         await message.delete()
+
+        warning_message = (
+            f"{message.author.mention}, je bericht is verwijderd omdat het "
+                f"ongepaste inhoud bevat. "
+                f"Severity niveaus - "
+                f"Haat: {response.hate_result.severity}, "
+                f"Zelfbeschadiging: {response.self_harm_result.severity}, "
+                f"Seksueel: {response.sexual_result.severity}, "
+                f"Geweld: {response.violence_result.severity}"
+        )
+        await message.channel.send(warning_message, delete_after=10)
+    except HttpResponseError as e:
+        print(f"Error analyzing message: {e}")
     
-    if not is_moderator:
-        message_content = message.content.lower()
-        
-        # Check for blocked words
-        if any(word in message_content for word in block_words):
-            await message.delete()
-            await message.channel.send(f"Bericht van {message.author.mention} is verwijderd omdat het ongepast was.")
-            return
-        
-        # Check for URLs (simple version)
-        if "http://" in message_content or "https://" in message_content:
-            await message.delete()
-            await message.channel.send(f"Bericht van {message.author.mention} is verwijderd omdat het links bevatte.")
-            return
     
-    print("Bericht niet verwijderd")
-    
-"""
-client.command(name='ban')
-@commands.has_role("Moderator")
-async def ban_user(ctx, member: discord.member, *, reason="Geen reden opgegeven"):
-"""
-client.run(token)
+    #await bot.process_commands(message)                    
+
+   
+
+bot.run(token)
 
 
 
