@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from azure.ai.contentsafety import ContentSafetyClient
 from azure.core.credentials import AzureKeyCredential
 from azure.core.exceptions import HttpResponseError
-from azure.ai.contentsafety.models import AnalyzeTextOptions
+from azure.ai.contentsafety.models import AnalyzeTextOptions, TextCategory
 
 load_dotenv()
 token = os.getenv("Discord_ModeratorBot_Token")
@@ -23,7 +23,7 @@ content_safety_client = ContentSafetyClient(
 
 @bot.event
 async def on_ready():
-    print("bot is online")
+    print("moderatorbot is online")
 
 @bot.event
 async def on_message(message):
@@ -33,26 +33,37 @@ async def on_message(message):
     try:
         request = AnalyzeTextOptions(text=message.content)
         response = content_safety_client.analyze_text(request)
-        if any([
-            response.hate.severity > 0 or 
-            response.self_harm.severity > 0 or
-            response.sexual.severity > 0 or
-            response.violence.severity > 0
-        ]):
-         await message.delete()
+        
+        # Get results for each category
+        hate_result = next((item for item in response.categories_analysis 
+                          if item.category == TextCategory.HATE), None)
+        self_harm_result = next((item for item in response.categories_analysis 
+                               if item.category == TextCategory.SELF_HARM), None)
+        sexual_result = next((item for item in response.categories_analysis 
+                            if item.category == TextCategory.SEXUAL), None)
+        violence_result = next((item for item in response.categories_analysis 
+                              if item.category == TextCategory.VIOLENCE), None)
 
-        warning_message = (
-            f"{message.author.mention}, je bericht is verwijderd omdat het "
-                f"ongepaste inhoud bevat. "
-                f"Severity niveaus - "
-                f"Haat: {response.hate_result.severity}, "
-                f"Zelfbeschadiging: {response.self_harm_result.severity}, "
-                f"Seksueel: {response.sexual_result.severity}, "
-                f"Geweld: {response.violence_result.severity}"
-        )
-        await message.channel.send(warning_message, delete_after=10)
+        # Check if any category has severity > 0
+        if any(result.severity > 0 for result in [hate_result, self_harm_result, 
+                                                sexual_result, violence_result] if result):
+            
+            await message.delete()
+            
+            warning_msg = (
+                f"{message.author.mention}, je bericht is verwijderd wegens ongepaste inhoud.\n"
+                f"Severiteit niveaus:\n"
+                f"Haat: {hate_result.severity if hate_result else 0}\n"
+                f"Zelfbeschadiging: {self_harm_result.severity if self_harm_result else 0}\n"
+                f"Seksuele content: {sexual_result.severity if sexual_result else 0}\n"
+                f"Geweld: {violence_result.severity if violence_result else 0}"
+            )
+            await message.channel.send(warning_msg, delete_after=10)
+            
     except HttpResponseError as e:
         print(f"Error analyzing message: {e}")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
     
     
     #await bot.process_commands(message)                    

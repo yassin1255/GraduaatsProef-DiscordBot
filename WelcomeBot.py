@@ -13,7 +13,7 @@ bot = commands.Bot(command_prefix='>', intents=discord.Intents.all())
 
 @bot.event
 async def on_ready():
-    print("bot is online")
+    print("welcomebot is online")
 
 @bot.event 
 async def on_member_join(member):
