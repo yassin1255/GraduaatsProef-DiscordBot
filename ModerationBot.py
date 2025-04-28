@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from azure.ai.contentsafety import ContentSafetyClient
 from azure.core.credentials import AzureKeyCredential
 from azure.core.exceptions import HttpResponseError
+import datetime
 from azure.ai.contentsafety.models import (
     AnalyzeTextOptions,
     AnalyzeImageOptions,
@@ -21,12 +22,36 @@ token = os.getenv("Discord_ModeratorBot_Token")
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='>', intents=intents)
+LOG_CHANNEL_ID = 1365969751515332640 
 
 # Initialize Azure clients
 content_safety_client = ContentSafetyClient(
     endpoint=os.getenv("Azure_Content_Safety_Endpoint"),
     credential=AzureKeyCredential(os.getenv("Azure_Content_Safety_Key"))
 )
+async def log_violation(log_channel, user, severity, content, channel=None, attachment=None):
+    """Logt violations naar een specifiek kanaal met bewijs."""
+    embed = discord.Embed(
+        title="🚨 Content Violation",
+        description=(
+            f"**User:** {user.mention}\n"
+            f"**Severity:** {severity}\n"
+            f"**Channel:** {channel.mention if channel else 'DM'}"
+        ),
+        color=discord.Color.red(),
+        timestamp=datetime.datetime.utcnow()
+    )
+    
+    # Voeg content toe (max 1000 tekens)
+    embed.add_field(name="Content", value=f"```{content[:1000]}```", inline=False)
+    
+    # Als er een afbeelding is, voeg die toe als bijlage
+    if attachment:
+        file = discord.File(await attachment.to_file(), filename="proof.png")
+        embed.set_image(url="attachment://proof.png")
+        await log_channel.send(embed=embed, file=file)
+    else:
+        await log_channel.send(embed=embed)
 
 async def analyze_text(content):
     """Analyze text content using Azure Content Safety"""
@@ -85,17 +110,21 @@ async def on_message(message):
     if message.content.startswith(bot.command_prefix) or not message.guild:
         return await bot.process_commands(message)
     
+    # Skip logkanaal
+    if message.channel.id == LOG_CHANNEL_ID:
+        return await bot.process_commands(message)
+    
     try:
+        log_channel = bot.get_channel(LOG_CHANNEL_ID)
+        max_severity = 0
+
         # Text analysis
         if message.content:
             print(f"[DEBUG] Analyzing text: {message.content}")
             text_severity = await analyze_text(message.content)
             print(f"[DEBUG] Text severity: {text_severity}")
-            
-            if text_severity >= 2:
-                await take_action(message, text_severity, "text")
-                return
-        
+            max_severity = max(max_severity, text_severity)
+
         # Image analysis
         for attachment in message.attachments:
             if any(attachment.filename.lower().endswith(ext) for ext in ['.jpg', '.png', '.jpeg']):
@@ -103,11 +132,19 @@ async def on_message(message):
                 image_bytes = await attachment.read()
                 image_severity = await analyze_image(image_bytes)
                 print(f"[DEBUG] Image severity: {image_severity}")
+                max_severity = max(max_severity, image_severity)
                 
-                if image_severity >= 2:
-                    await take_action(message, image_severity, "image")
-                    return
-    
+                # Log afbeelding violation
+                await log_violation(log_channel, message.author, image_severity,
+                   f"Image: {attachment.filename}", message.channel, attachment)
+
+        # Actie ondernemen en tekst loggen
+        if max_severity >= 2:
+            if message.content and not message.attachments:
+                await log_violation(log_channel, message.author, max_severity,
+                   message.content, message.channel)
+            await take_action(message, max_severity)
+
     except HttpResponseError as e:
         print(f"[AZURE ERROR] {e}")
     except Exception as e:
