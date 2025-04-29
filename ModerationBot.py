@@ -78,14 +78,14 @@ async def take_action(message, max_severity, content_type="text"):
     if max_severity >= 4:
         try:
             await message.author.ban(reason=f"Inappropriate {content_type} (severity {max_severity})")
-            await message.channel.send(f"{message.author.mention} is verbannen wegens ernstig ongepaste inhoud.")
+            await message.channel.send(f"{message.author.mention} is verbannen wegens ernstig ongepaste inhoud.", delete_after=15)
         except discord.Forbidden:
-            await message.channel.send("Geen ban permissies.")
+            await message.channel.send("Geen ban permissies.", delete_after=15)
     
     elif max_severity >= 3:
         try:
             await message.author.kick(reason=f"Inappropriate {content_type} (severity {max_severity})")
-            await message.channel.send(f"{message.author.mention} is gekicked wegens ongepaste inhoud.")
+            await message.channel.send(f"{message.author.mention} is gekicked wegens ongepaste inhoud.", delete_after=15)
         except discord.Forbidden:
             await message.channel.send("Geen kick permissies.")
     
@@ -97,14 +97,14 @@ async def take_action(message, max_severity, content_type="text"):
                 for channel in message.guild.channels:
                     await channel.set_permissions(muted_role, send_messages=False)
             except discord.Forbidden:
-                await message.channel.send("Kan Muted rol niet maken.")
+                await message.channel.send("Kan Muted rol niet maken.", delete_after=15)
                 return
         
         try:
             await message.author.add_roles(muted_role)
-            await message.channel.send(f"{message.author.mention} is gemute voor ongepaste inhoud.")
+            await message.channel.send(f"{message.author.mention} is gemute voor ongepaste inhoud.", delete_after=15)
         except discord.Forbidden:
-            await message.channel.send("Geen mute permissies.")
+            await message.channel.send("Geen mute permissies.", delete_after=15)
     
     await message.delete()
     print(f"[ACTION] {content_type.capitalize()} verwijderd met severity {max_severity}")
