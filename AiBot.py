@@ -4,16 +4,53 @@ from dotenv import load_dotenv
 from groq import Groq
 import io
 from datetime import datetime
-
-
+import PyPDF2  
 
 load_dotenv()
 intents = discord.Intents.default()
 intents.message_content = True  
 bot = discord.Client(intents=intents)
 groq_client = Groq(api_key=os.getenv("Groq_API_Key"))
- 
- 
+
+def extract_text_from_pdf(file_content):
+    
+    text = ""
+    try:
+        with io.BytesIO(file_content) as pdf_file:
+            reader = PyPDF2.PdfReader(pdf_file)
+            for page in reader.pages:
+                text += page.extract_text()
+    except Exception as e:
+        print(f"Fout bij PDF extractie: {e}")
+    return text
+
+def extract_text_from_txt(file_content):
+    
+    try:
+        return file_content.decode('utf-8')
+    except Exception as e:
+        print(f"Fout bij TXT extractie: {e}")
+        return ""
+
+async def process_attachments(message):
+    
+    extracted_texts = []
+    
+    for attachment in message.attachments:
+        if attachment.filename.lower().endswith('.pdf'):
+            file_content = await attachment.read()
+            text = extract_text_from_pdf(file_content)
+            if text:
+                extracted_texts.append(f"PDF-bestand '{attachment.filename}':\n{text[:2000]}...")  # Beperk tot eerste 2000 tekens voor preview
+                
+        elif attachment.filename.lower().endswith('.txt'):
+            file_content = await attachment.read()
+            text = extract_text_from_txt(file_content)
+            if text:
+                extracted_texts.append(f"Tekstbestand '{attachment.filename}':\n{text[:2000]}...")  # Beperk tot eerste 2000 tekens voor preview
+    
+    return "\n\n".join(extracted_texts) if extracted_texts else None
+
 @bot.event
 async def on_ready():
     print(f'Bot is ingelogd als {bot.user}')
@@ -23,25 +60,28 @@ async def on_message(message):
     if bot.user.mentioned_in(message):
         user_input = message.content.replace(f'<@{bot.user.id}>', '').strip()
         
+       
+        attachment_text = ""
+        if message.attachments:
+            attachment_text = await process_attachments(message)
+            if attachment_text:
+                user_input += f"\n\nHier is de inhoud van de bijgevoegde bestanden:\n{attachment_text}"
+        
         async with message.channel.typing():
             try:
                 response = groq_client.chat.completions.create(
                     model="llama3-70b-8192",
                     messages=[{"role": "user", "content": user_input}],
-                    max_tokens=4000  # Meer tokens voor langere antwoorden
+                    max_tokens=4000
                 )
                 
                 antwoord = response.choices[0].message.content
                 
                 if len(antwoord) > 1900:
-                    # Maak een tekstbestand aan
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     filename = f"antwoord_{timestamp}.txt"
-                    
-                    # Maak een 'file-like object' aan
                     file = io.StringIO(antwoord)
                     discord_file = discord.File(file, filename=filename)
-                    
                     await message.reply("Hier is mijn uitgebreide antwoord:", file=discord_file)
                 else:
                     await message.reply(antwoord)
@@ -50,5 +90,4 @@ async def on_message(message):
                 await message.reply(f"⚠️ Fout: {str(e)}")
 
 
-# Start de bot
-bot.run(os.getenv("Discord_StudyBot_Token"))    
+bot.run(os.getenv("Discord_StudyBot_Token"))

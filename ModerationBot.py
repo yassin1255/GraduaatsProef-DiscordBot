@@ -15,17 +15,17 @@ from azure.ai.contentsafety.models import (
     ImageCategory
 )
 
-# Load environment variables
+
 load_dotenv()
 token = os.getenv("Discord_ModeratorBot_Token")
 
-# Initialize bot
+
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='>', intents=intents)
 LOG_CHANNEL_ID = 1365969751515332640 
 
-# Initialize Azure clients
+
 content_safety_client = ContentSafetyClient(
     endpoint=os.getenv("Azure_Content_Safety_Endpoint"),
     credential=AzureKeyCredential(os.getenv("Azure_Content_Safety_Key"))
@@ -40,14 +40,14 @@ async def log_violation(log_channel, user, severity, content, channel=None, atta
             f"**Channel:** {channel.mention if channel else 'DM'}"
         ),
         color=discord.Color.red(),
-        timestamp=datetime.datetime.now(datetime.timezone.utc)  # Opgeloste deprecation warning
+        timestamp=datetime.datetime.now(datetime.timezone.utc)  
     )
     
     embed.add_field(name="Content", value=f"```{content[:1000]}```", inline=False)
     
     if attachment:
         try:
-            # Correcte manier om attachment te verwerken
+            
             file = discord.File(
                 BytesIO(await attachment.read()),
                 filename=attachment.filename
@@ -126,14 +126,14 @@ async def on_message(message):
         log_channel = bot.get_channel(LOG_CHANNEL_ID)
         max_severity = 0
 
-        # Text analysis
+        
         if message.content:
             print(f"[DEBUG] Analyzing text: {message.content}")
             text_severity = await analyze_text(message.content)
             print(f"[DEBUG] Text severity: {text_severity}")
             max_severity = max(max_severity, text_severity)
 
-        # Image analysis
+        
         for attachment in message.attachments:
             if any(attachment.filename.lower().endswith(ext) for ext in ['.jpg', '.png', '.jpeg']):
                 print(f"[DEBUG] Analyzing image: {attachment.filename}")
@@ -147,7 +147,7 @@ async def on_message(message):
                     f"Image: {attachment.filename} ({attachment.url})", 
                     message.channel, attachment)
 
-        # Actie ondernemen en tekst loggen
+        
         if max_severity >= 2:
             if message.content and not message.attachments:
                 await log_violation(log_channel, message.author, max_severity,
