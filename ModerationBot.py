@@ -22,7 +22,7 @@ token = os.getenv("Discord_ModeratorBot_Token")
 
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix='>', intents=intents)
+bot = commands.Bot(command_prefix='!', intents=intents)
 LOG_CHANNEL_ID = 1365969751515332640 
 
 

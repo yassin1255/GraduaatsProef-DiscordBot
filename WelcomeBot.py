@@ -9,7 +9,7 @@ load_dotenv()
 token = os.getenv("Discord_WelcomBot_Token")
 
 
-bot = commands.Bot(command_prefix='>', intents=discord.Intents.all())
+bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
 
 @bot.event
 async def on_ready():
