@@ -6,7 +6,14 @@ from discord.ext import commands
 from atproto import Client, models
 import datetime
 import requests
+import matplotlib.pyplot as plt
+import pandas as pd
 from io import BytesIO
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
+
 
 load_dotenv()
 
@@ -18,11 +25,165 @@ GUILD_ID = int(os.getenv("GUILD_ID"))
 LIVE_CHANNEL_ID = int(os.getenv("LIVE_CHANNEL_ID"))  
 STREAM_URL = os.getenv("STREAM_URL") 
 
+DEFAULT_EMAIL = os.getenv("DEFAULT_EMAIL")
+EMAIL_FROM = os.getenv("EMAIL_FROM")
+SMTP_SERVER = os.getenv("SMTP_SERVER")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USERNAME = os.getenv("SMTP_USERNAME")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+
+
 intents = discord.Intents.default()
 intents.message_content = True
 
 bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 bsky_client = Client()
+
+
+def parse_bluesky_timestamp(timestamp_str):
+    """Speciale parser voor Bluesky timestamps die niet altijd perfect ISO format zijn"""
+    try:
+        # Verwijder nanoseconden als die te lang zijn
+        if '.' in timestamp_str:
+            parts = timestamp_str.split('.')
+            if len(parts[1]) > 6:  # Meer dan 6 decimalen
+                timestamp_str = f"{parts[0]}.{parts[1][:6]}{parts[1][6:]}"
+        
+        # Zorg voor correcte timezone format
+        if timestamp_str.endswith('Z'):
+            timestamp_str = timestamp_str[:-1] + '+00:00'
+        elif '+' in timestamp_str and timestamp_str.count(':') == 2:  # Alleen tijd heeft :
+            timestamp_str = timestamp_str.replace('+', '+00:')
+        elif '-' in timestamp_str and timestamp_str.count(':') == 2:
+            timestamp_str = timestamp_str.replace('-', '-00:')
+        
+        # Parse de datetime
+        dt = datetime.datetime.fromisoformat(timestamp_str)
+        if not dt.tzinfo:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        return dt
+    except ValueError as e:
+        print(f"Fout bij parsen timestamp {timestamp_str}: {str(e)}")
+        return None
+
+@bot.tree.command(name="statsvandaag", description="Toon stats van posts in de afgelopen 24 uur")
+@app_commands.describe(email="Optioneel emailadres om de stats naar toe te sturen")
+async def statsvandaag(interaction: discord.Interaction, email: str = None):
+    if interaction.channel_id != STATS_CHANNEL_ID:
+        await interaction.response.send_message(
+            "❌ Dit commando werkt alleen in het stats-kanaal!",
+            ephemeral=True
+        )
+        return
+    
+    try:
+        await interaction.response.defer()
+        
+        # Bereken 24 uur geleden
+        now = datetime.datetime.now(datetime.timezone.utc)
+        twenty_four_hours_ago = now - datetime.timedelta(hours=24)
+        
+        # Haal posts op en filter op tijd
+        feed = bsky_client.get_author_feed(actor=BSKY_HANDLE)
+        recent_posts = [
+            post for post in feed.feed 
+            if parse_bluesky_timestamp(post.post.record.created_at) >= twenty_four_hours_ago
+        ]
+        
+        if not recent_posts:
+            await interaction.followup.send("❌ Geen posts gevonden in de afgelopen 24 uur!", ephemeral=True)
+            return
+        
+       
+        post_data = []
+        for post in recent_posts:
+            post_time = parse_bluesky_timestamp(post.post.record.created_at)
+            hour = post_time.hour
+            likes = post.post.like_count or 0
+            reposts = post.post.repost_count or 0
+            replies = post.post.reply_count or 0
+            
+            post_data.append({
+                'hour': hour,
+                'likes': likes,
+                'reposts': reposts,
+                'replies': replies,
+                'total_engagement': likes + reposts + replies,
+                'post_text': post.post.record.text[:50] + "..." if len(post.post.record.text) > 50 else post.post.record.text,
+                'post_url': f"https://bsky.app/profile/{BSKY_HANDLE}/post/{post.post.uri.split('/')[-1]}"
+            })
+        
+        df = pd.DataFrame(post_data)
+        hourly_stats = df.groupby('hour').agg({
+            'likes': 'sum',
+            'reposts': 'sum',
+            'replies': 'sum',
+            'total_engagement': 'sum',
+        }).reindex(range(24), fill_value=0)
+        
+        
+        plt.figure(figsize=(10, 5))
+        plt.bar(hourly_stats.index, hourly_stats['total_engagement'], color='skyblue', alpha=0.7, label='Engagement')
+        plt.plot(hourly_stats.index, hourly_stats['likes'], 'r-', label='Likes')
+        plt.plot(hourly_stats.index, hourly_stats['reposts'], 'g-', label='Reposts')
+        plt.xlabel('Uur van de dag')
+        plt.ylabel('Aantal')
+        plt.title('Activiteit laatste 24 uur')
+        plt.legend()
+        plt.tight_layout()
+        
+        
+        img_buffer = BytesIO()
+        plt.savefig(img_buffer, format='png', dpi=100)
+        plt.close()
+        img_buffer.seek(0)
+        
+        
+        top_post = df.loc[df['total_engagement'].idxmax()]
+        embed = discord.Embed(
+            title="📊 Stats laatste 24 uur",
+            description=f"**Top post:** {top_post['post_text']}\n"
+                       f"❤️ {top_post['likes']} | 🔄 {top_post['reposts']} | 💬 {top_post['replies']}\n"
+                       f"🔗 [Bekijk post]({top_post['post_url']})",
+            color=0x1DA1F2
+        )
+        embed.set_image(url="attachment://stats.png")
+        
+       
+        await interaction.followup.send(
+            embed=embed,
+            file=discord.File(img_buffer, filename='stats.png')
+        )
+        
+       
+        if email or DEFAULT_EMAIL:
+            msg = MIMEMultipart()
+            msg['From'] = EMAIL_FROM or DEFAULT_EMAIL
+            msg['To'] = email or DEFAULT_EMAIL
+            msg['Subject'] = f"Bluesky stats - {now.strftime('%d/%m/%Y')}"
+            
+            email_text = f"Bluesky statistieken laatste 24 uur\n\n" \
+                        f"Totaal posts: {len(recent_posts)}\n" \
+                        f"Totaal engagement: {df['total_engagement'].sum()}\n" \
+                        f"Top post: {top_post['post_text']}\n" \
+                        f"Likes: {top_post['likes']} | Reposts: {top_post['reposts']} | Replies: {top_post['replies']}\n" \
+                        f"Link: {top_post['post_url']}"
+            
+            msg.attach(MIMEText(email_text))
+            img_buffer.seek(0)
+            msg.attach(MIMEImage(img_buffer.read()))
+            
+            try:
+                with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+                    server.starttls()
+                    server.login(SMTP_USERNAME, SMTP_PASSWORD)
+                    server.send_message(msg)
+                await interaction.followup.send(f"✅ Stats verzonden naar {email or DEFAULT_EMAIL}", ephemeral=True)
+            except Exception as e:
+                await interaction.followup.send(f"⚠️ Email versturen mislukt: {str(e)}", ephemeral=True)
+        
+    except Exception as e:
+        await interaction.followup.send(f"⚠️ Fout: {str(e)}", ephemeral=True)
 
 @bot.event
 async def on_ready():
