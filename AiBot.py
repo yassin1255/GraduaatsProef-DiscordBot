@@ -13,6 +13,7 @@ intents.message_content = True
 bot = discord.Client(intents=intents)
 groq_client = Groq(api_key=os.getenv("Groq_API_Key"))
 
+STUDY_CHANNEL_ID = os.getenv("STUDYBOT_CHANNEL")
 
 MAX_HISTORY = 12  
 message_history = deque(maxlen=MAX_HISTORY)  
@@ -56,6 +57,10 @@ async def on_ready():
 
 @bot.event
 async def on_message(message):
+    
+    if message.channel.id != STUDY_CHANNEL_ID:  
+        return
+    
     if bot.user.mentioned_in(message):
         user_input = message.content.replace(f'<@{bot.user.id}>', '').strip()
         
