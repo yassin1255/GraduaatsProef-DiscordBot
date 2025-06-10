@@ -30,7 +30,7 @@ GUILD_ID = int(os.getenv("GUILD_ID", 0))
 LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_BOT", 0))
 LOG_CHANNEL_MODERATOR_ID = int(os.getenv("LOG_CHANNEL_MODERATOR", 0))
 
-# Configuratie (demo-vriendelijk)
+
 MSG_THRESHOLD = 3    # Na 3 berichten -> slowmode
 TIME_WINDOW = 5      # Binnen 5 seconden
 SLOWMODE_DURATION = 5  # Slowmode duur (seconden)
@@ -94,22 +94,66 @@ async def analyze_image(image_bytes):
     return max(item.severity for item in response.categories_analysis)
 
 async def take_action(message, max_severity, content_type="text"):
-    """Take appropriate action based on severity"""
+    reason = f"Inappropriate {content_type} (severity {max_severity})"
+    
     if max_severity >= 4:
+       
         try:
-            await message.author.ban(reason=f"Inappropriate {content_type} (severity {max_severity})")
+            
+            try:
+                embed = discord.Embed(
+                    title=f"Je bent verbannen van {message.guild.name}",
+                    color=discord.Color.red()
+                )
+                embed.add_field(name="Reden", value=reason, inline=False)
+                embed.add_field(
+                    name="Unban aanvragen", 
+                    value="Neem contact op met een moderator en vermeld @yassin1255 om een unban aan te vragen.",
+                    inline=False
+                )
+                embed.set_footer(text=f"Verbannen door {bot.user.name}")
+                await message.author.send(embed=embed)
+            except discord.Forbidden:
+                pass
+
+            
+            await message.author.ban(reason=reason)
             await message.channel.send(f"{message.author.mention} is verbannen wegens ernstig ongepaste inhoud.", delete_after=10)
+            
         except discord.Forbidden:
             await message.channel.send("Geen ban permissies.", delete_after=5)
     
     elif max_severity >= 3:
+      
         try:
-            await message.author.kick(reason=f"Inappropriate {content_type} (severity {max_severity})")
+            
+            try:
+                invite = await message.channel.create_invite(max_uses=1, unique=True)
+                embed = discord.Embed(
+                    title=f"Je bent gekicked van {message.guild.name}",
+                    color=discord.Color.orange()
+                )
+                embed.add_field(name="Reden", value=reason, inline=False)
+                embed.add_field(
+                    name="Je kunt weer joinen", 
+                    value=f"Gebruik deze invite link: {invite.url}\n"
+                         f"Let op: deze link kan maar 1 keer gebruikt worden!",
+                    inline=False
+                )
+                embed.set_footer(text=f"Gekicked door {bot.user.name}")
+                await message.author.send(embed=embed)
+            except discord.Forbidden:
+                pass
+
+           
+            await message.author.kick(reason=reason)
             await message.channel.send(f"{message.author.mention} is gekicked wegens ongepaste inhoud.", delete_after=10)
+            
         except discord.Forbidden:
-            await message.channel.send("Geen kick permissies.")
+            await message.channel.send("Geen kick permissies.", delete_after=5)
     
     elif max_severity >= 2:
+      
         muted_role = discord.utils.get(message.guild.roles, name="Muted")
         if not muted_role:
             try:
@@ -121,8 +165,28 @@ async def take_action(message, max_severity, content_type="text"):
                 return
         
         try:
+         
+            try:
+                embed = discord.Embed(
+                    title=f"Je bent gemute in {message.guild.name}",
+                    description="Je kunt niet meer praten in tekst- en spraakkanalen.",
+                    color=discord.Color.orange()
+                )
+                embed.add_field(name="Reden", value=reason, inline=False)
+                embed.add_field(
+                    name="Unmute aanvragen", 
+                    value="Neem contact op met @yassin1255 om een unmute aan te vragen.",
+                    inline=False
+                )
+                embed.set_footer(text=f"Gemute door {bot.user.name}")
+                await message.author.send(embed=embed)
+            except discord.Forbidden:
+                pass
+
+       
             await message.author.add_roles(muted_role)
             await message.channel.send(f"{message.author.mention} is gemute voor ongepaste inhoud.", delete_after=15)
+            
         except discord.Forbidden:
             await message.channel.send("Geen mute permissies.", delete_after=15)
     
@@ -382,6 +446,7 @@ async def ban(interaction: discord.Interaction, gebruiker: discord.Member, reden
                 inline=False
             )
             embed.set_footer(text=f"Verbannen door {interaction.user}")
+            
             
             await gebruiker.send(embed=embed)
         except discord.Forbidden:
