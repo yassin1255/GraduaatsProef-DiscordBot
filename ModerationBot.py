@@ -14,6 +14,8 @@ from azure.ai.contentsafety.models import (
     TextCategory,
     ImageCategory
 )
+from collections import defaultdict
+import asyncio
 
 
 load_dotenv()
@@ -27,6 +29,16 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 GUILD_ID = int(os.getenv("GUILD_ID", 0))  
 LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_BOT", 0))
 LOG_CHANNEL_MODERATOR_ID = int(os.getenv("LOG_CHANNEL_MODERATOR", 0))
+
+# Configuratie (demo-vriendelijk)
+MSG_THRESHOLD = 3    # Na 3 berichten -> slowmode
+TIME_WINDOW = 5      # Binnen 5 seconden
+SLOWMODE_DURATION = 5  # Slowmode duur (seconden)
+NORMAL_SLOWMODE = 0   # Standaard slowmode (0 = uit)
+
+# Tracking
+message_counts = defaultdict(int)
+channel_status = defaultdict(bool)  # Bijhoudt per kanaal
 
 
 if GUILD_ID == 0:
@@ -453,7 +465,64 @@ async def unban(interaction: discord.Interaction, gebruiker_id: str, reden: str 
             ephemeral=True
         )
 
+@bot.event
+async def on_message(message):
+    if message.author.bot or message.content.startswith(bot.command_prefix):
+        return await bot.process_commands(message)
 
+    channel = message.channel
+    channel_id = channel.id
+
+    # Tel bericht mee
+    message_counts[channel_id] += 1
+
+    # Start cooldown timer
+    asyncio.create_task(cooldown_counter(channel_id))
+
+    # Activeer slowmode indien nodig
+    if not channel_status[channel_id] and message_counts[channel_id] >= MSG_THRESHOLD:
+        await activate_slowmode(channel)
+    
+    await bot.process_commands(message)
+
+async def cooldown_counter(channel_id):
+    await asyncio.sleep(TIME_WINDOW)
+    message_counts[channel_id] -= 1
+    
+    if message_counts[channel_id] <= 0:
+        message_counts[channel_id] = 0
+        channel = bot.get_channel(channel_id)
+        
+        if channel and channel_status[channel_id]:  
+            await deactivate_slowmode(channel) 
+
+async def activate_slowmode(channel):
+    """Activeer slowmode met melding"""
+    channel_id = channel.id
+    channel_status[channel_id] = True
+    
+    # Bewaar originele slowmode
+    original_slowmode = channel.slowmode_delay
+    
+    # Pas slowmode aan
+    await channel.edit(slowmode_delay=SLOWMODE_DURATION)
+    warning_msg = await channel.send(
+        f"⏳ **Slowmode actief** ({SLOWMODE_DURATION}s/bericht)\n"
+        f"*Te veel berichten in {TIME_WINDOW} seconden*", delete_after=10
+    )
+
+async def deactivate_slowmode(channel, original_slowmode=0, warning_msg=None):
+    """Zet slowmode uit"""
+    channel_id = channel.id
+    channel_status[channel_id] = False
+    
+    await channel.edit(slowmode_delay=original_slowmode)
+    if warning_msg:
+        try:
+            await warning_msg.delete()
+        except:
+            pass
+    await channel.send("✅ **Slowmode uitgeschakeld** (Chat is weer normaal)", delete_after=10)
 
 
 @bot.event
