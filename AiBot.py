@@ -58,9 +58,6 @@ async def on_ready():
 @bot.event
 async def on_message(message):
     
-    if message.channel.id != STUDY_CHANNEL_ID:  
-        return
-    
     if bot.user.mentioned_in(message):
         user_input = message.content.replace(f'<@{bot.user.id}>', '').strip()
         
