@@ -98,14 +98,14 @@ async def take_action(message, max_severity, content_type="text"):
     if max_severity >= 4:
         try:
             await message.author.ban(reason=f"Inappropriate {content_type} (severity {max_severity})")
-            await message.channel.send(f"{message.author.mention} is verbannen wegens ernstig ongepaste inhoud.", delete_after=15)
+            await message.channel.send(f"{message.author.mention} is verbannen wegens ernstig ongepaste inhoud.", delete_after=10)
         except discord.Forbidden:
-            await message.channel.send("Geen ban permissies.", delete_after=15)
+            await message.channel.send("Geen ban permissies.", delete_after=5)
     
     elif max_severity >= 3:
         try:
             await message.author.kick(reason=f"Inappropriate {content_type} (severity {max_severity})")
-            await message.channel.send(f"{message.author.mention} is gekicked wegens ongepaste inhoud.", delete_after=15)
+            await message.channel.send(f"{message.author.mention} is gekicked wegens ongepaste inhoud.", delete_after=10)
         except discord.Forbidden:
             await message.channel.send("Geen kick permissies.")
     
@@ -117,7 +117,7 @@ async def take_action(message, max_severity, content_type="text"):
                 for channel in message.guild.channels:
                     await channel.set_permissions(muted_role, send_messages=False)
             except discord.Forbidden:
-                await message.channel.send("Kan Muted rol niet maken.", delete_after=15)
+                await message.channel.send("Kan Muted rol niet maken.", delete_after=10)
                 return
         
         try:
@@ -129,8 +129,8 @@ async def take_action(message, max_severity, content_type="text"):
     await message.delete()
     print(f"[ACTION] {content_type.capitalize()} verwijderd met severity {max_severity}")
 
-@bot.event
-async def on_message(message):
+async def handle_moderation(message):
+    
     if message.author == bot.user:
         return
     
@@ -146,14 +146,12 @@ async def on_message(message):
         log_channel = bot.get_channel(LOG_CHANNEL_ID)
         max_severity = 0
 
-        
         if message.content:
             print(f"[DEBUG] Analyzing text: {message.content}")
             text_severity = await analyze_text(message.content)
             print(f"[DEBUG] Text severity: {text_severity}")
             max_severity = max(max_severity, text_severity)
 
-        
         for attachment in message.attachments:
             if any(attachment.filename.lower().endswith(ext) for ext in ['.jpg', '.png', '.jpeg']):
                 print(f"[DEBUG] Analyzing image: {attachment.filename}")
@@ -167,7 +165,6 @@ async def on_message(message):
                     f"Image: {attachment.filename} ({attachment.url})", 
                     message.channel, attachment)
 
-        
         if max_severity >= 2:
             if message.content and not message.attachments:
                 await log_violation(log_channel, message.author, max_severity,
@@ -180,6 +177,7 @@ async def on_message(message):
         print(f"[ERROR] {e}")
     
     await bot.process_commands(message)
+    return True
 
 @bot.tree.command(name="mute", description="Mute een gebruiker")
 @commands.has_permissions(manage_roles=True)
@@ -465,8 +463,8 @@ async def unban(interaction: discord.Interaction, gebruiker_id: str, reden: str 
             ephemeral=True
         )
 
-@bot.event
-async def on_message(message):
+async def handle_slowmode(message):
+  
     if message.author.bot or message.content.startswith(bot.command_prefix):
         return await bot.process_commands(message)
 
@@ -484,6 +482,7 @@ async def on_message(message):
         await activate_slowmode(channel)
     
     await bot.process_commands(message)
+    return True
 
 async def cooldown_counter(channel_id):
     await asyncio.sleep(TIME_WINDOW)
@@ -524,6 +523,15 @@ async def deactivate_slowmode(channel, original_slowmode=0, warning_msg=None):
             pass
     await channel.send("✅ **Slowmode uitgeschakeld** (Chat is weer normaal)", delete_after=10)
 
+@bot.event
+async def on_message(message):
+    
+    await handle_slowmode(message)
+    await handle_moderation(message)
+    
+    
+    if not (message.author.bot or message.content.startswith(bot.command_prefix)):
+        await bot.process_commands(message)
 
 @bot.event
 async def on_ready():
