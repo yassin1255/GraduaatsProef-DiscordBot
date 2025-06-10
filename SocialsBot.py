@@ -156,31 +156,31 @@ async def statsvandaag(interaction: discord.Interaction, email: str = None):
         )
         
        
-        if email or DEFAULT_EMAIL:
-            msg = MIMEMultipart()
-            msg['From'] = EMAIL_FROM or DEFAULT_EMAIL
-            msg['To'] = email or DEFAULT_EMAIL
-            msg['Subject'] = f"Bluesky stats - {now.strftime('%d/%m/%Y')}"
+        # if email or DEFAULT_EMAIL:
+        #     msg = MIMEMultipart()
+        #     msg['From'] = EMAIL_FROM or DEFAULT_EMAIL
+        #     msg['To'] = email or DEFAULT_EMAIL
+        #     msg['Subject'] = f"Bluesky stats - {now.strftime('%d/%m/%Y')}"
             
-            email_text = f"Bluesky statistieken laatste 24 uur\n\n" \
-                        f"Totaal posts: {len(recent_posts)}\n" \
-                        f"Totaal engagement: {df['total_engagement'].sum()}\n" \
-                        f"Top post: {top_post['post_text']}\n" \
-                        f"Likes: {top_post['likes']} | Reposts: {top_post['reposts']} | Replies: {top_post['replies']}\n" \
-                        f"Link: {top_post['post_url']}"
+        #     email_text = f"Bluesky statistieken laatste 24 uur\n\n" \
+        #                 f"Totaal posts: {len(recent_posts)}\n" \
+        #                 f"Totaal engagement: {df['total_engagement'].sum()}\n" \
+        #                 f"Top post: {top_post['post_text']}\n" \
+        #                 f"Likes: {top_post['likes']} | Reposts: {top_post['reposts']} | Replies: {top_post['replies']}\n" \
+        #                 f"Link: {top_post['post_url']}"
             
-            msg.attach(MIMEText(email_text))
-            img_buffer.seek(0)
-            msg.attach(MIMEImage(img_buffer.read()))
+        #     msg.attach(MIMEText(email_text))
+        #     img_buffer.seek(0)
+        #     msg.attach(MIMEImage(img_buffer.read()))
             
-            try:
-                with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-                    server.starttls()
-                    server.login(SMTP_USERNAME, SMTP_PASSWORD)
-                    server.send_message(msg)
-                await interaction.followup.send(f"✅ Stats verzonden naar {email or DEFAULT_EMAIL}", ephemeral=True)
-            except Exception as e:
-                await interaction.followup.send(f"⚠️ Email versturen mislukt: {str(e)}", ephemeral=True)
+        #     try:
+        #         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        #             server.starttls()
+        #             server.login(SMTP_USERNAME, SMTP_PASSWORD)
+        #             server.send_message(msg)
+        #         await interaction.followup.send(f"✅ Stats verzonden naar {email or DEFAULT_EMAIL}", ephemeral=True)
+        #     except Exception as e:
+        #         await interaction.followup.send(f"⚠️ Email versturen mislukt: {str(e)}", ephemeral=True)
         
     except Exception as e:
         await interaction.followup.send(f"⚠️ Fout: {str(e)}", ephemeral=True)
