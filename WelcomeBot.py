@@ -17,7 +17,7 @@ async def on_ready():
 
 @bot.event 
 async def on_member_join(member):
-    channel = bot.get_channel(1358385144024530964)
+    channel = bot.get_channel("WELCOME_CHANNEL_ID") 
     if channel is None:
         print("Channel not found")
         return
