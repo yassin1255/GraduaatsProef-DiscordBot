@@ -16,27 +16,27 @@ groq_client = Groq(api_key=os.getenv("Groq_API_Key"))
 STUDY_CHANNEL_ID = os.getenv("STUDYBOT_CHANNEL")
 
 MAX_HISTORY = 12  
-message_history = deque(maxlen=MAX_HISTORY)  
+message_history = deque(maxlen=MAX_HISTORY)  #deue voor historie bijhouden 
 
-def extract_text_from_pdf(file_content):
+def extract_text_from_pdf(file_content):# functie voor pdf te kunnen lezen voor de ai
     text = ""
     try:
         with io.BytesIO(file_content) as pdf_file:
             reader = PyPDF2.PdfReader(pdf_file)
             for page in reader.pages:
-                text += page.extract_text()
+                text += page.extract_text() # tekst uit de pdf halen
     except Exception as e:
         print(f"Fout bij PDF extractie: {e}")
     return text
 
-def extract_text_from_txt(file_content):
+def extract_text_from_txt(file_content): #tekst uit .txt bestand halen 
     try:
-        return file_content.decode('utf-8')
+        return file_content.decode('utf-8') #naar utf 8 decoderen 
     except Exception as e:
         print(f"Fout bij TXT extractie: {e}")
         return ""
 
-async def process_attachments(message):
+async def process_attachments(message): # functie voor te kijken of bijlagen pdf of txt zijn en deze te verwerken
     extracted_texts = []
     for attachment in message.attachments:
         if attachment.filename.lower().endswith('.pdf'):
@@ -62,12 +62,12 @@ async def on_message(message):
         user_input = message.content.replace(f'<@{bot.user.id}>', '').strip()
         
         
-        if "nieuw onderwerp" in user_input.lower():
+        if "nieuw onderwerp" in user_input.lower():# reset de historie voor van nul te beginnen
             message_history.clear()
             await message.reply("🔄 Oké, ik begin met een schone lei!")
             return
         
-        attachment_text = ""
+        attachment_text = "" ## voor het verwerken van bijlagen
         if message.attachments:
             attachment_text = await process_attachments(message)
             if attachment_text:
@@ -90,7 +90,7 @@ async def on_message(message):
                
                 message_history.append({"role": "assistant", "content": antwoord})
 
-                if len(antwoord) > 1900:
+                if len(antwoord) > 1900: # als het antwoord te lang is, sla het op in een txt bestand en verstuur ddat
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     filename = f"antwoord_{timestamp}.txt"
                     file = io.StringIO(antwoord)

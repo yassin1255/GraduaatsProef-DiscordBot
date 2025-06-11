@@ -24,7 +24,7 @@ STATS_CHANNEL_ID = int(os.getenv("STATS_CHANNEL_ID"))
 GUILD_ID = int(os.getenv("GUILD_ID")) 
 LIVE_CHANNEL_ID = int(os.getenv("LIVE_CHANNEL_ID"))  
 STREAM_URL = os.getenv("STREAM_URL") 
-
+# voor email functionaliteit
 DEFAULT_EMAIL = os.getenv("DEFAULT_EMAIL")
 EMAIL_FROM = os.getenv("EMAIL_FROM")
 SMTP_SERVER = os.getenv("SMTP_SERVER")
@@ -40,7 +40,7 @@ bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 bsky_client = Client()
 
 
-def parse_bluesky_timestamp(timestamp_str):
+def parse_bluesky_timestamp(timestamp_str):# voer deze functie kunnen we de timestamp van Bluesky goed parsen
     """Speciale parser voor Bluesky timestamps die niet altijd perfect ISO format zijn"""
     try:
         # Verwijder nanoseconden als die te lang zijn
@@ -203,7 +203,7 @@ async def on_ready():
     except Exception as e:
         print(f"Bluesky login fout: {str(e)}")
 
-async def download_media(url):
+async def download_media(url): # deze functie download de images die worden meegegeven later gebruikt in de post command
     response = requests.get(url)
     if response.status_code == 200:
         return BytesIO(response.content)
