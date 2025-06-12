@@ -51,7 +51,7 @@ content_safety_client = ContentSafetyClient(
     credential=AzureKeyCredential(os.getenv("Azure_Content_Safety_Key"))
 )
 async def log_violation(log_channel, user, severity, content, channel=None, attachment=None):
-    """Logt violations naar een specifiek kanaal met bewijs."""
+   
     embed = discord.Embed(
         title="🚨 Content Violation",
         description=(
@@ -82,13 +82,13 @@ async def log_violation(log_channel, user, severity, content, channel=None, atta
     await log_channel.send(embed=embed)
 
 async def analyze_text(content):
-    """Analyze text content using Azure Content Safety"""
+   
     request = AnalyzeTextOptions(text=content)
     response = content_safety_client.analyze_text(request)
     return max(item.severity for item in response.categories_analysis)
 
 async def analyze_image(image_bytes):
-    """Analyze image content using Azure Content Safety"""
+    
     request = AnalyzeImageOptions(image=ImageData(content=image_bytes))
     response = content_safety_client.analyze_image(request)
     return max(item.severity for item in response.categories_analysis)
@@ -128,7 +128,7 @@ async def take_action(message, max_severity, content_type="text"):
         try:
             
             try:
-                invite = await message.channel.create_invite(max_uses=1, unique=True)
+                
                 embed = discord.Embed(
                     title=f"Je bent gekicked van {message.guild.name}",
                     color=discord.Color.orange()
@@ -136,7 +136,7 @@ async def take_action(message, max_severity, content_type="text"):
                 embed.add_field(name="Reden", value=reason, inline=False)
                 embed.add_field(
                     name="Je kunt weer joinen", 
-                    value=f"Gebruik deze invite link: {invite.url}\n"
+                    value=f"Neem contact op met een moderator en vermeld @yassin1255 om een invite link aan te vragen."
                          f"Let op: deze link kan maar 1 keer gebruikt worden!",
                     inline=False
                 )
@@ -246,7 +246,7 @@ async def handle_moderation(message):
 @bot.tree.command(name="mute", description="Mute een gebruiker")
 @commands.has_permissions(manage_roles=True)
 async def mute(interaction: discord.Interaction, gebruiker: discord.Member, reden: str = "Geen reden opgegeven"):
-    """Mute een gebruiker"""
+   
     # Controleer of de bot de gebruiker kan muten
     if gebruiker.top_role >= interaction.guild.me.top_role:
         await interaction.response.send_message("Ik kan deze gebruiker niet muten omdat ze een hogere/equal rol hebben.", ephemeral=True)
@@ -313,7 +313,7 @@ async def mute(interaction: discord.Interaction, gebruiker: discord.Member, rede
 @bot.tree.command(name="unmute", description="Unmute een gebruiker")
 @commands.has_permissions(manage_roles=True)
 async def unmute(interaction: discord.Interaction, gebruiker: discord.Member, reden: str = "Geen reden opgegeven"):
-    """Handmatig een gebruiker unmuten"""
+    
     muted_role = discord.utils.get(interaction.guild.roles, name="Muted")
     
     if not muted_role or muted_role not in gebruiker.roles:
@@ -357,7 +357,7 @@ async def unmute(interaction: discord.Interaction, gebruiker: discord.Member, re
 @bot.tree.command(name="kick", description="Kick een gebruiker van de server")
 @commands.has_permissions(kick_members=True)
 async def kick(interaction: discord.Interaction, gebruiker: discord.Member, reden: str = "Geen reden opgegeven"):
-    """Kick een gebruiker en stuur een DM met details"""
+    
     
     # Controleer of de bot de gebruiker kan kicken
     if gebruiker.top_role >= interaction.guild.me.top_role:
@@ -370,7 +370,7 @@ async def kick(interaction: discord.Interaction, gebruiker: discord.Member, rede
     try:
         # Stuur eerst een DM naar de gebruiker
         try:
-            invite = await interaction.channel.create_invite(max_uses=1, unique=True)
+           
             embed = discord.Embed(
                 title=f"Je bent gekicked van {interaction.guild.name}",
                 color=discord.Color.orange()
@@ -378,7 +378,7 @@ async def kick(interaction: discord.Interaction, gebruiker: discord.Member, rede
             embed.add_field(name="Reden", value=reden, inline=False)
             embed.add_field(
                 name="Je kunt weer joinen", 
-                value=f"Gebruik deze invite link: {invite.url}\n"
+                value=f"Neem contact op met een moderator en vermeld @yassin1255 om een invite link aan te vragen."
                      f"Let op: deze link kan maar 1 keer gebruikt worden!",
                 inline=False
             )
@@ -422,7 +422,7 @@ async def kick(interaction: discord.Interaction, gebruiker: discord.Member, rede
 @bot.tree.command(name="ban", description="Ban een gebruiker van de server")
 @commands.has_permissions(ban_members=True)
 async def ban(interaction: discord.Interaction, gebruiker: discord.Member, reden: str = "Geen reden opgegeven"):
-    """Ban een gebruiker en stuur een DM met details"""
+   
     
     # Controleer of de bot de gebruiker kan bannen
     if gebruiker.top_role >= interaction.guild.me.top_role:
@@ -484,7 +484,7 @@ async def ban(interaction: discord.Interaction, gebruiker: discord.Member, reden
 @bot.tree.command(name="unban", description="Unban een gebruiker")
 @commands.has_permissions(ban_members=True)
 async def unban(interaction: discord.Interaction, gebruiker_id: str, reden: str = "Geen reden opgegeven"):
-    """Unban een gebruiker op basis van ID"""
+    
     try:
         gebruiker = await bot.fetch_user(int(gebruiker_id))
     except (discord.NotFound, ValueError):
@@ -561,7 +561,7 @@ async def cooldown_counter(channel_id):
             await deactivate_slowmode(channel) 
 
 async def activate_slowmode(channel):
-    """Activeer slowmode met melding"""
+    
     channel_id = channel.id
     channel_status[channel_id] = True
     
@@ -576,7 +576,7 @@ async def activate_slowmode(channel):
     )
 
 async def deactivate_slowmode(channel, original_slowmode=0, warning_msg=None):
-    """Zet slowmode uit"""
+    
     channel_id = channel.id
     channel_status[channel_id] = False
     
@@ -608,7 +608,7 @@ async def on_ready():
         
         guild = discord.Object(id=GUILD_ID)
         
-        # Dit kopieert de globale commands naar je guild, zodat ze direct beschikbaar zijn
+        # Dit kopieert de globale commands naar de guild, zodat ze direct beschikbaar zijn
         bot.tree.copy_global_to(guild=guild)
         
         # Sync de commands met de specifieke guild

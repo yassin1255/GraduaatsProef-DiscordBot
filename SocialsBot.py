@@ -41,7 +41,7 @@ bsky_client = Client()
 
 
 def parse_bluesky_timestamp(timestamp_str):# voer deze functie kunnen we de timestamp van Bluesky goed parsen
-    """Speciale parser voor Bluesky timestamps die niet altijd perfect ISO format zijn"""
+    
     try:
         # Verwijder nanoseconden als die te lang zijn
         if '.' in timestamp_str:
@@ -113,7 +113,7 @@ async def statsvandaag(interaction: discord.Interaction, email: str = None):
                 'post_url': f"https://bsky.app/profile/{BSKY_HANDLE}/post/{post.post.uri.split('/')[-1]}"
             })
         
-        df = pd.DataFrame(post_data)
+        df = pd.DataFrame(post_data)# results voor in de grafiek per uur
         hourly_stats = df.groupby('hour').agg({
             'likes': 'sum',
             'reposts': 'sum',
@@ -122,7 +122,7 @@ async def statsvandaag(interaction: discord.Interaction, email: str = None):
         }).reindex(range(24), fill_value=0)
         
         
-        plt.figure(figsize=(10, 5))
+        plt.figure(figsize=(10, 5))# makken van de grafiek
         plt.bar(hourly_stats.index, hourly_stats['total_engagement'], color='skyblue', alpha=0.7, label='Engagement')
         plt.plot(hourly_stats.index, hourly_stats['likes'], 'r-', label='Likes')
         plt.plot(hourly_stats.index, hourly_stats['reposts'], 'g-', label='Reposts')
@@ -139,7 +139,7 @@ async def statsvandaag(interaction: discord.Interaction, email: str = None):
         img_buffer.seek(0)
         
         
-        top_post = df.loc[df['total_engagement'].idxmax()]
+        top_post = df.loc[df['total_engagement'].idxmax()] # kies de meeste populaire post
         embed = discord.Embed(
             title="📊 Stats laatste 24 uur",
             description=f"**Top post:** {top_post['post_text']}\n"
@@ -292,7 +292,7 @@ async def post(
     media4: discord.Attachment = None
 ):
     try:
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True)# defer omdat ik voorkom dat het lang ga duren 
         
         embed = None
         media_items = [m for m in [media1, media2, media3, media4] if m is not None and m.content_type.startswith('image/')]

@@ -43,12 +43,12 @@ async def process_attachments(message): # functie voor te kijken of bijlagen pdf
             file_content = await attachment.read()
             text = extract_text_from_pdf(file_content)
             if text:
-                extracted_texts.append(f"PDF-bestand '{attachment.filename}':\n{text[:2000]}...")
+                extracted_texts.append(f"PDF-bestand '{attachment.filename}':\n{text[:20000]}...")
         elif attachment.filename.lower().endswith('.txt'):
             file_content = await attachment.read()
             text = extract_text_from_txt(file_content)
             if text:
-                extracted_texts.append(f"Tekstbestand '{attachment.filename}':\n{text[:2000]}...")
+                extracted_texts.append(f"Tekstbestand '{attachment.filename}':\n{text[:20000]}...")
     return "\n\n".join(extracted_texts) if extracted_texts else None
 
 @bot.event
